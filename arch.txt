@@ -1,0 +1,37 @@
+[React App]
+    │
+    ▼
+[Java API Gateway (Spring)]
+    │  ├─ AuthZ/AuthN (JWT/OAuth)
+    │  ├─ Rate limits, schema validation
+    │  └─ A/B flags & experiment headers
+    │
+    ├─────────────────────────────────────────────────────────────────────┐
+    ▼                                                                     ▼
+[Profile Service (Py)]                                             [Recommend Service (Py)]
+- CV/letter parsing (Tika)                                         - Stage A: Vector retrieval
+- Skill & role extraction                                          - Stage B: Re-ranker (XGBoost)
+- Preference mining (letters + form)                               - Explanations (“Why this”)
+- Profile embedding (SBERT)                                        - Diversity & fairness post-proc
+    │                                                                     │
+    └────▶ [Feature Store] & [Obj Store]                                  │
+                                                                          │
+                         ┌────────────────────────────────────────────────┘
+                         ▼
+                 [Data Layer & Infra]
+   ┌──────────────────────────────┬───────────────────────────────┬─────────────────────────┐
+   │ Postgres (users, jobs,       │ Vector Index (pgvector/       │ Cache & Queue           │
+   │ interactions, configs)       │ FAISS/OpenSearch)              │ (Redis + Kafka/Rabbit)  │
+   └──────────────────────────────┴───────────────────────────────┴─────────────────────────┘
+                 │                          │                                 │
+                 ▼                          ▼                                 ▼
+         [Job Ingestor (Java)]      [Embedder (Py)]                    [Event Collector (Java)]
+         - Calls jobs API           - Job embeddings                   - Impressions, clicks,
+         - Normalize schema         - Profile embeddings                 applies, dismisses
+         - Company/parent mapping                                          
+                 │                          │                                 │
+                 └──────────────► [Batch & Training (Py + Airflow/Prefect + MLflow)]
+                                   - Weak labels & pairwise sets
+                                   - Train ranker / cross-encoder
+                                   - Offline eval (NDCG/MRR)
+                                   - Registry + rollout (canary)
